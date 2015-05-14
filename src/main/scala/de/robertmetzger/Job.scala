@@ -19,6 +19,7 @@ package de.robertmetzger
  */
 
 import java.nio.charset.Charset
+import java.util.Date
 
 import org.apache.flink.api.scala._
 import scala.collection.JavaConversions._
@@ -29,6 +30,29 @@ import org.apache.james.mime4j.message.DefaultMessageBuilder
  * Based on https://svn.apache.org/repos/asf/james/mime4j/trunk/examples/src/main/java/org/apache/james/mime4j/samples/mbox/IterateOverMbox.java
  */
 object Job {
+
+  val ml_keys = List("machine learning", "ml")
+  val python_keys = List("python", "pyspark")
+  val scala_keys = List("Scala")
+  val java_keys = List("Java")
+  val sql_keys = List("SQL", "sparksql")
+  val streaming_keys = List("Streaming", "Kafka")
+  val mesos_key = List("mesos")
+
+  /**
+   * Contains the frequencies of the different topics
+   */
+  case class Result(ml: Int,
+                    python: Int,
+                    scala: Int,
+                    java: Int,
+                    sql: Int,
+                    streaming: Int,
+                    yarn: Int,
+                    mesos: Int) {
+    def this() = this(0,0,0,0,0,0,0,0)
+  }
+
   def main(args: Array[String]) {
     // set up the execution environment
     val env = ExecutionEnvironment.createCollectionsEnvironment
@@ -37,23 +61,31 @@ object Job {
     // read messages locally into a list:
     val mboxFile = "/media/green/data/Dropbox/Dropbox/apache-mail-archives/flink-dev/201502.mbox"
     val mboxIterator = MboxIterator.fromFile(mboxFile).charset(encoding).build().iterator().toSeq
-    /*val list = for(messageChars <- mboxIterator) {
-      val builder = new DefaultMessageBuilder()
-      val message = builder.parseMessage(messageChars.asInputStream(encoding))
-      println("Subject: "+message.getSubject)
-    } yield  { 1 } */
+
     val list = mboxIterator.map(messageChars => {
       val builder = new DefaultMessageBuilder()
       val message = builder.parseMessage(messageChars.asInputStream(encoding))
-      println("Subject: "+message.getSubject)
-      message
+      (message.getSubject, message.getDate)
     })
 
     val messagesDs = env.fromCollection(list)
-    val byDay = messagesDs.groupBy( el => {el.getDate.getDay})
-    
+    val byDay = messagesDs.groupBy( el => {el._2.getDay})
+    val result = byDay.reduceGroup( messages => {
+      var day: Date = null
+      val results = messages.map( message => {
+        day = message._2
+        var result = new Result()
+        var subj = message._1
+        // TODO here
+        result
+      }).toSeq
+      (day, results)
+    })
 
+    result.print
     // execute program
-    //env.execute("Flink Scala API Skeleton")
+    env.execute("Flink Scala API Skeleton")
   }
 }
+
+
