@@ -18,54 +18,42 @@ package de.robertmetzger
  * limitations under the License.
  */
 
+import java.nio.charset.Charset
+
 import org.apache.flink.api.scala._
+import scala.collection.JavaConversions._
+import org.apache.james.mime4j.mboxiterator.{CharBufferWrapper, MboxIterator}
+import org.apache.james.mime4j.message.DefaultMessageBuilder
 
 /**
- * Skeleton for a Flink Job.
- *
- * For a full example of a Flink Job, see the WordCountJob.scala file in the
- * same package/directory or have a look at the website.
- *
- * You can also generate a .jar file that you can submit on your Flink
- * cluster. Just type
- * {{{
- *   mvn clean package
- * }}}
- * in the projects root directory. You will find the jar in
- * target/flink-quickstart-0.1-SNAPSHOT-Sample.jar
- *
+ * Based on https://svn.apache.org/repos/asf/james/mime4j/trunk/examples/src/main/java/org/apache/james/mime4j/samples/mbox/IterateOverMbox.java
  */
 object Job {
   def main(args: Array[String]) {
     // set up the execution environment
-    val env = ExecutionEnvironment.getExecutionEnvironment
+    val env = ExecutionEnvironment.createCollectionsEnvironment
 
-    /**
-     * Here, you can start creating your execution plan for Flink.
-     *
-     * Start with getting some data from the environment, like
-     * env.readTextFile(textPath);
-     *
-     * then, transform the resulting DataSet[String] using operations
-     * like:
-     *   .filter()
-     *   .flatMap()
-     *   .join()
-     *   .group()
-     *
-     * and many more.
-     * Have a look at the programming guide:
-     *
-     * http://flink.apache.org/docs/latest/programming_guide.html
-     *
-     * and the examples
-     *
-     * http://flink.apache.org/docs/latest/examples.html
-     *
-     */
+    val encoding = Charset.forName("UTF-8");
+    // read messages locally into a list:
+    val mboxFile = "/media/green/data/Dropbox/Dropbox/apache-mail-archives/flink-dev/201502.mbox"
+    val mboxIterator = MboxIterator.fromFile(mboxFile).charset(encoding).build().iterator().toSeq
+    /*val list = for(messageChars <- mboxIterator) {
+      val builder = new DefaultMessageBuilder()
+      val message = builder.parseMessage(messageChars.asInputStream(encoding))
+      println("Subject: "+message.getSubject)
+    } yield  { 1 } */
+    val list = mboxIterator.map(messageChars => {
+      val builder = new DefaultMessageBuilder()
+      val message = builder.parseMessage(messageChars.asInputStream(encoding))
+      println("Subject: "+message.getSubject)
+      message
+    })
 
+    val messagesDs = env.fromCollection(list)
+    val byDay = messagesDs.groupBy( el => {el.getDate.getDay})
+    
 
     // execute program
-    env.execute("Flink Scala API Skeleton")
+    //env.execute("Flink Scala API Skeleton")
   }
 }
